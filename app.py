@@ -26,45 +26,52 @@ st.write("""
 **【打線の組み方ガイド】**
 ⚾️ **1番（左上）：** あなたがビール沼に落ちた「きっかけの1本」
 ⚾️ **4番（真ん中）：** あなたの人生で最も影響を与えた「不動のエース」
-※その他の打順は、あなたの自由な感性で選んでください！
-
-📸 **写真についてのヒント**
-「あの頃の1本の写真がない！」という時は、公式サイトの画像を**引用（スクリーンショット等）**して、あなたの思い出を補完してもOKです。
+※画像では自動的に4番が中央に配置されます。
 """)
 
-# サイドパネル設定
-st.sidebar.header("⚙️ 設定")
-user_id = st.sidebar.text_input("Instagram ID (任意)", "@")
-st.sidebar.write("---")
-st.sidebar.write("完成したら #私を構成する9本のビール打線 をつけてシェア！")
+# --- ここにハッシュタグとシェアの案内を「目立つよう」に追加 ---
+st.success("""
+**📸 完成したらSNSでシェアしよう！**
+ハッシュタグ： **#私を構成する9本のビール打線**
+を付けて投稿してください！ @worldbeer_labo をタグ付けしてもらえると全力で見に行きます🍻
+""")
 
-# グリッドの見た目通りの打順配置
-# [1番, 2番, 3番]
-# [6番, 4番, 5番]  <- 真ん中に4番(主砲)を配置
-# [7番, 8番, 9番]
-grid_layout = [
-    [1, 2, 3],
-    [6, 4, 5],
-    [7, 8, 9]
-]
+st.write("""
+📸 **写真についてのヒント**
+「あの頃の1本の写真がない！」という時は、公式サイトの画像を引用するなど、あなたの思い出を補完してもOKです。
+""")
 
+# インスタID入力（スマホでも見やすい位置へ）
+user_id = st.text_input("👤 あなたのInstagram ID (任意：画像に透かしが入ります)", "@")
+
+# 入力データ保存用
 images = {}
 labels = {}
 
-st.subheader("⚾️ 打線を組む")
-st.info("スマホの方は、上から順番に入力していけば自然な打順になります。")
+# 打順(1-9)を画像のどの位置(0-8)に配置するかを定義
+# 4番を画像の中央(インデックス4)に固定
+order_to_grid_map = {
+    1: 0, 2: 1, 3: 2,
+    4: 4, 5: 5, 6: 3, 
+    7: 6, 8: 7, 9: 8
+}
 
-# 入力フォームの生成
-for r_idx, row_orders in enumerate(grid_layout):
+st.subheader("⚾️ 打線を組む")
+st.info("1番打者から順番に、あなたの思い出のビールを入力してください。")
+
+# 入力フォームの生成 (1から9まで順番に表示)
+for row in range(3):
     cols = st.columns(3)
-    for c_idx, order in enumerate(row_orders):
-        grid_pos = (r_idx * 3) + c_idx
-        with cols[c_idx]:
+    for col in range(3):
+        order = row * 3 + col + 1 # 1, 2, 3 ... 9 の順
+        with cols[col]:
             st.markdown(f"### 【{order}番打者】")
             uploaded_file = st.file_uploader(f"画像を選択", type=['jpg', 'jpeg', 'png'], key=f"up_{order}")
             if uploaded_file:
-                images[grid_pos] = Image.open(uploaded_file)
-            labels[grid_pos] = st.text_input(f"ブルワリー / ビール名", key=f"txt_{order}", placeholder="例: El Segundo")
+                images[order] = Image.open(uploaded_file)
+            labels[order] = st.text_input(f"ブルワリー / ビール名", 
+                                         key=f"txt_{order}", 
+                                         placeholder="例：ヤッホーブルーイング よなよなエール")
 
 # 画像生成ロジック
 if st.button("🍺 この打線で画像を生成する"):
@@ -75,16 +82,15 @@ if st.button("🍺 この打線で画像を生成する"):
         canvas = Image.new('RGB', (CANVAS_SIZE, CANVAS_SIZE), (255, 255, 255))
         draw = ImageDraw.Draw(canvas)
         
-        for i in range(9):
-            row, col = i // 3, i % 3
-            x, y = col * CELL_SIZE, row * CELL_SIZE
+        # 1番から9番までを、指定したグリッド位置に配置
+        for order in range(1, 10):
+            grid_pos = order_to_grid_map[order]
+            r, c = grid_pos // 3, grid_pos % 3
+            x, y = c * CELL_SIZE, r * CELL_SIZE
             
-            # 打順番号を取得
-            order_num = grid_layout[row][col]
-
-            if i in images:
+            if order in images:
                 # 画像加工
-                img = center_crop(images[i])
+                img = center_crop(images[order])
                 canvas.paste(img, (x, y))
                 
                 # テキスト用の黒帯（半透明）
@@ -92,12 +98,12 @@ if st.button("🍺 この打線で画像を生成する"):
                 canvas.paste(overlay, (x, y + CELL_SIZE - 80), overlay)
                 
                 # テキスト描画
-                text = f"{order_num}. {labels[i]}"
+                text = f"{order}. {labels[order]}"
                 draw.text((x + 15, y + CELL_SIZE - 60), text, fill=(255, 255, 255))
             else:
                 # 空枠の描画
                 draw.rectangle([x, y, x + CELL_SIZE, y + CELL_SIZE], outline=(220, 220, 220))
-                draw.text((x + CELL_SIZE//3, y + CELL_SIZE//2), f"{order_num}番打者", fill=(200, 200, 200))
+                draw.text((x + CELL_SIZE//3, y + CELL_SIZE//2), f"{order}番打者", fill=(200, 200, 200))
 
         # インスタIDの透かし
         if user_id and user_id != "@":
