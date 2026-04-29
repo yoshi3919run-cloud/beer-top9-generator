@@ -20,7 +20,7 @@ def download_font():
             with open(FONT_PATH, "wb") as f:
                 f.write(response.content)
         except:
-            pass # フォントDL失敗時はデフォルトを使用
+            pass
 
 download_font()
 
@@ -29,7 +29,7 @@ CANVAS_W = 1080
 CANVAS_H = 1350
 GRID_SIZE = 1080
 CELL_SIZE = GRID_SIZE // 3
-OFFSET_Y = 250  # タイトルエリア用
+OFFSET_Y = 260  # タイトルとハッシュタグ用にスペースを確保
 
 def center_crop(img):
     img = img.convert("RGB")
@@ -43,14 +43,11 @@ def center_crop(img):
 
 st.set_page_config(page_title="私を構成する9本のビール打線メーカー", layout="wide")
 
-# アプリのタイトル
+# アプリのタイトル（画面用）
 st.title("🍺 #私を構成する9本のビール打線 メーカー")
 
-# 導入文（「9枚揃わなくてもOK」を追記）
 st.write("""
-ビールは、人生を語る。
 あなたを形作った「思い出の9本」で、最強の布陣を組んでみませんか？
-
 「最近ハマったビール」でも「人生を変えた1杯」でも、あなたが好きなビールなら何でもOKです！
 
 ---
@@ -58,10 +55,10 @@ st.write("""
 **【入力のヒント】**
 
 ✅ **9枚全部埋まらなくても大丈夫！**
-（1枚からでも画像は作れます。空いた枠は白枠として残るので、まずは今のベストを形にしましょう）
+（1枚からでも画像は作れます。空いた枠はグレーの枠として残ります）
 
 ✅ **ブルワリー名や銘柄はわかる範囲でOK！**
-（わからない情報は空欄でも大丈夫です。ブルワリー名だけでも立派なリストになります）
+（「ブルワリー名 / ビール名」のようにスラッシュで区切ると、画像内で綺麗に2行に分かれます）
 
 ✅ **1番（左上）と4番（真ん中）から決めるのがコツ！**
 
@@ -73,17 +70,13 @@ st.write("""
 
 st.success("""
 **📸 完成したらSNSでシェアしよう！**
-
 ハッシュタグ： **#私を構成する9本のビール打線**
-
-を付けて投稿してください！
-@world_beer_lab をタグ付けしてもらえると全力で見に行きます🍻
+を付けて投稿してください！ @world_beer_lab をタグ付けしてもらえると全力で見に行きます🍻
 """)
 
 st.info("""
 📸 **写真がない時は？**
-
-「昔飲んだあの1本の写真がない！」という時は、公式サイトの画像を**引用（スクリーンショット等）**して、あなたの思い出を補完してもOKです。
+「昔飲んだあの1本の写真がない！」という時は、公式サイトの画像を**引用（スクリーンショット等）**して思い出を補完してもOKです。
 """)
 
 # インスタID入力
@@ -115,7 +108,7 @@ for row in range(3):
                     st.write("✅ 読み込み完了")
                 except:
                     st.error("エラー")
-            labels[order] = st.text_input(f"ブルワリー / ビール名", key=f"txt_{order}", placeholder="例：ヤッホー / よなよな")
+            labels[order] = st.text_input(f"ブルワリー / ビール名", key=f"txt_{order}", placeholder="例：ヤッホー / よなよなエール")
 
 # 画像生成ロジック
 if st.button("🍺 この打線でインスタ縦長画像を生成する"):
@@ -128,21 +121,30 @@ if st.button("🍺 この打線でインスタ縦長画像を生成する"):
 
             # 日本語フォント設定
             try:
-                title_font = ImageFont.truetype(FONT_PATH, 75)
+                title_font = ImageFont.truetype(FONT_PATH, 65)  # 少し小さく調整
+                hashtag_font = ImageFont.truetype(FONT_PATH, 35) # ハッシュタグ用
                 id_font = ImageFont.truetype(FONT_PATH, 35)
                 label_font = ImageFont.truetype(FONT_PATH, 32)
             except:
                 title_font = ImageFont.load_default()
+                hashtag_font = ImageFont.load_default()
                 id_font = ImageFont.load_default()
                 label_font = ImageFont.load_default()
 
-            # 1. タイトルの描画（〇〇のベスト9打線）
+            # 1. タイトルとハッシュタグの描画
             display_id = user_id if user_id != "@" else "私"
-            title_text = f"{display_id} を構成する\n9本のビール打線"
+            title_text = f"{display_id} を構成する ビール打線"
+            hashtag_text = "#私を構成する9本のビール打線"
             
-            bbox = draw.textbbox((0, 0), title_text, font=title_font)
-            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-            draw.multiline_text(((CANVAS_W - tw) // 2, 40), title_text, font=title_font, fill=(255, 255, 255), align="center", spacing=15)
+            # メインタイトル
+            bbox1 = draw.textbbox((0, 0), title_text, font=title_font)
+            tw1 = bbox1[2] - bbox1[0]
+            draw.text(((CANVAS_W - tw1) // 2, 60), title_text, font=title_font, fill=(255, 255, 255))
+            
+            # ハッシュタグ（タイトルの下）
+            bbox2 = draw.textbbox((0, 0), hashtag_text, font=hashtag_font)
+            tw2 = bbox2[2] - bbox2[0]
+            draw.text(((CANVAS_W - tw2) // 2, 160), hashtag_text, font=hashtag_font, fill=(200, 200, 200))
 
             # 2. 各セルの描画
             for order in range(1, 10):
@@ -155,21 +157,32 @@ if st.button("🍺 この打線でインスタ縦長画像を生成する"):
                     img_cropped = center_crop(images[order])
                     canvas.paste(img_cropped, (x, y))
                     
-                    overlay = Image.new('RGBA', (CELL_SIZE, 120), (0, 0, 0, 200))
-                    canvas.paste(overlay, (x, y + CELL_SIZE - 120), overlay)
+                    # テキスト用の黒帯（高さを135pxに広げて2行分を確保）
+                    overlay_h = 135
+                    overlay = Image.new('RGBA', (CELL_SIZE, overlay_h), (0, 0, 0, 200))
+                    canvas.paste(overlay, (x, y + CELL_SIZE - overlay_h), overlay)
                     
-                    raw_text = labels[order].replace("/", "\n").replace(" ", "\n")
-                    display_text = f"{order}. {raw_text}"
-                    draw.multiline_text((x + 15, y + CELL_SIZE - 105), display_text, font=label_font, fill=(255, 255, 255), spacing=5)
+                    # テキスト描画のロジック
+                    # 「 / 」で区切られていれば改行、なければそのまま表示
+                    raw_input = labels[order]
+                    if " / " in raw_input:
+                        display_text = f"{order}. " + raw_input.replace(" / ", "\n")
+                    elif "/" in raw_input:
+                        display_text = f"{order}. " + raw_input.replace("/", "\n")
+                    else:
+                        display_text = f"{order}. {raw_input}"
+                    
+                    # 複数行描画（spacingで2行の間隔を調整）
+                    draw.multiline_text((x + 15, y + CELL_SIZE - 120), display_text, font=label_font, fill=(255, 255, 255), spacing=8)
                 else:
-                    # 画像なし：白枠（薄いグレーの枠）を描画
+                    # 画像なし：白枠
                     draw.rectangle([x, y, x + CELL_SIZE, y + CELL_SIZE], fill=(40, 40, 40), outline=(100, 100, 100), width=2)
                     draw.text((x + CELL_SIZE//3, y + CELL_SIZE//2), f"{order}番", font=label_font, fill=(100, 100, 100))
 
             # 3. フッター (Instagram ID)
             if user_id and user_id != "@":
                 footer_text = f"Created by {user_id}"
-                draw.text((CANVAS_W - 400, CANVAS_H - 70), footer_text, font=id_font, fill=(180, 180, 180))
+                draw.text((CANVAS_W - 450, CANVAS_H - 70), footer_text, font=id_font, fill=(150, 150, 150))
 
             st.image(canvas, caption="完成！長押しして保存してください")
             
