@@ -98,24 +98,25 @@ st.title("⚾️ #推しビールで打線を組んでみた メーカー")
 
 # --- 元の詳細な説明文を復旧 ---
 st.write("""
-ビールは、人生を語る。
-あなたを形作った、忘れられない9本で最強の布陣を組んでみませんか？
+ビールは人生を語る。
+あなたが大好きな推しビールで打線を組んでみんなで共有しよう！
 
 ---
 
 **【打線の組み方ガイド】**
 
 ✅ **1番（左上）：『原点』**
-あなたがビール沼に落ちた「きっかけの1本」を選びましょう。
+あなたがビールにハマった「きっかけの1本」を選びましょう。
 
 ✅ **4番（真ん中）：『エース』**
-あなたの人生で最も影響を与えた「不動のエース」を配置してください。
+あなたが一番大好きな「不動のエース」を選びましょう。
 
 ✅ **9枚全部埋まらなくてもOK！**
 1枚からでも作成可能です。空いた枠はスタジアム風のパネルとして表示されます。
 
 📸 **写真についてのヒント**
-「あの1本の写真がない！」という時は、公式サイトの画像を**引用（スクリーンショット等）**して思い出を補完してもOKです。
+「あの1本の写真がない！」という時は、公式サイトの画像を引用するなどして思い出を補完するのも方法の１つ。
+画像がうまくアップロードできないときは、もう一度やり直すとうまくいくことがあります！
 なお、写真がなくても文字だけの打線を作ることも可能です。
 """)
 
@@ -125,16 +126,16 @@ st.success("""
 
 #推しビールで打線を組んでみた を付けて投稿！
 
-**@world_beer_lab** をタグ付けしてシェアしてくれたら、監督（ジミー）が全力でコメントしに伺います🍻
+**@world_beerlabo** をタグ付けしてシェアしてくれたら、びあらぼが全力でコメントしに伺います🍻
 """)
 
-team_name = st.text_input("👤 監督名（またはチーム名）を入力", "@")
+team_name = st.text_input("👤 チーム名（またはインスタアカウント名）を入力", "@")
 
 order_to_grid_map = {1: 0, 2: 1, 3: 2, 4: 4, 5: 5, 6: 3, 7: 6, 8: 7, 9: 8}
 images, labels = {}, {}
 
 st.subheader("🏟️ 打順を入力する")
-st.write("「ブルワリー / ビール名」のようにスラッシュを入れると境目がわかりやすくなります。")
+st.write("「ビール名 / ブルワリー」のようにスラッシュを入れると境目がわかりやすくなります。")
 
 for row in range(3):
     cols = st.columns(3)
@@ -150,7 +151,7 @@ for row in range(3):
             labels[order] = st.text_input(f"ブルワリー / ビール名", key=f"txt_{order}", placeholder="例：ヤッホー / よなよな")
 
 # --- 生成ボタン（文言とゴールド色を維持） ---
-if st.button("⚾️ チームを作る（スコアボード生成）"):
+if st.button("⚾️ チームを作る（画像生成）"):
     if not images and not any(labels.values()):
         st.error("入力が必要です")
     else:
@@ -231,7 +232,7 @@ if st.button("⚾️ チームを作る（スコアボード生成）"):
                     draw.text((x + 115, y + 155), status, font=label_font, fill=(60, 120, 80))
 
             # フッター（被らないよう最下部に配置）
-            footer_text = "Produced by World Beer Lab"
+            footer_text = "Produced by World Beer Labo"
             bbox_f = draw.textbbox((0,0), footer_text, font=footer_font)
             fw = bbox_f[2] - bbox_f[0]
             draw.text(((CANVAS_W - fw)//2, CANVAS_H - 55), footer_text, font=footer_font, fill=(255, 255, 255, 100))
@@ -242,7 +243,7 @@ if st.button("⚾️ チームを作る（スコアボード生成）"):
             # --- 保存ボタン（スタジアムグリーンと文言を維持） ---
             buf = io.BytesIO()
             canvas.save(buf, format="PNG")
-            st.download_button(label="📥 チームを保存（スコアボード保存）", data=buf.getvalue(), file_name="beer_lineup.png", mime="image/png")
+            st.download_button(label="📥 チームを保存（画像保存）", data=buf.getvalue(), file_name="beer_lineup.png", mime="image/png")
 
 st.write("---")
-st.caption("© World Beer Lab")
+st.caption("© World Beer Labo")
