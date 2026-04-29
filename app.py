@@ -3,6 +3,7 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import requests
 import os
+import textwrap
 from pillow_heif import register_heif_opener
 
 # iPhone写真(HEIC)対応
@@ -29,7 +30,35 @@ CANVAS_W = 1080
 CANVAS_H = 1350
 GRID_SIZE = 1080
 CELL_SIZE = GRID_SIZE // 3
-OFFSET_Y = 260  # タイトルとハッシュタグ用にスペースを確保
+HEADER_H = 210  # タイトルエリア
+FOOTER_H = 60   # 最下部のフッターエリア
+OFFSET_Y = HEADER_H
+
+# --- ヘルパー関数：フォントサイズを自動調整（Excelの縮小表示） ---
+def get_fitting_font(text, max_width, initial_size):
+    size = initial_size
+    while size > 15:
+        font = ImageFont.truetype(FONT_PATH, size)
+        bbox = ImageDraw.Draw(Image.new('RGB', (1, 1))).textbbox((0, 0), text, font=font)
+        if (bbox[2] - bbox[0]) <= max_width:
+            return font
+        size -= 2
+    return ImageFont.truetype(FONT_PATH, size)
+
+# --- ヘルパー関数：日本語対応のテキスト折り返し ---
+def wrap_text(text, font, max_width):
+    lines = []
+    current_line = ""
+    for char in text:
+        test_line = current_line + char
+        bbox = ImageDraw.Draw(Image.new('RGB', (1, 1))).textbbox((0, 0), test_line, font=font)
+        if (bbox[2] - bbox[0]) <= max_width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = char
+    lines.append(current_line)
+    return "\n".join(lines[:3]) # 最大3行まで
 
 def center_crop(img):
     img = img.convert("RGB")
@@ -42,58 +71,22 @@ def center_crop(img):
     return img.crop((left, top, right, bottom)).resize((CELL_SIZE, CELL_SIZE), Image.LANCZOS)
 
 st.set_page_config(page_title="私を構成する9本のビール打線メーカー", layout="wide")
-
-# アプリのタイトル（画面用）
 st.title("🍺 #私を構成する9本のビール打線 メーカー")
 
 st.write("""
 あなたを形作った「思い出の9本」で、最強の布陣を組んでみませんか？
-「最近ハマったビール」でも「人生を変えた1杯」でも、あなたが好きなビールなら何でもOKです！
-
----
-
-**【入力のヒント】**
-
-✅ **9枚全部埋まらなくても大丈夫！**
-（1枚からでも画像は作れます。空いた枠はグレーの枠として残ります）
-
-✅ **ブルワリー名や銘柄はわかる範囲でOK！**
-（「ブルワリー名 / ビール名」のようにスラッシュで区切ると、画像内で綺麗に2行に分かれます）
-
-✅ **1番（左上）と4番（真ん中）から決めるのがコツ！**
-
-1番：あなたがビール沼に落ちた「きっかけの1本」
-4番：あなたの人生で最も影響を与えた「不動のエース」
-
-※画像では自動的に4番が中央に配置されます。
+※9枚全部埋まらなくてもOKです！
 """)
 
-st.success("""
-**📸 完成したらSNSでシェアしよう！**
-ハッシュタグ： **#私を構成する9本のビール打線**
-を付けて投稿してください！ @world_beer_lab をタグ付けしてもらえると全力で見に行きます🍻
-""")
+st.success("**📸 完成したらSNSでシェア！**\n#私を構成する9本のビール打線")
 
-st.info("""
-📸 **写真がない時は？**
-「昔飲んだあの1本の写真がない！」という時は、公式サイトの画像を**引用（スクリーンショット等）**して思い出を補完してもOKです。
-""")
+user_id = st.text_input("👤 あなたのInstagram ID (任意)", "@")
 
-# インスタID入力
-user_id = st.text_input(
-    "👤 あなたのInstagram ID (任意)", 
-    "@", 
-    help="入力すると画像にあなたのIDが入り、あなたのオリジナル作品であることが証明されます。不要な場合は空欄（@のみ）でOKです。"
-)
-
-# 4番を中央(インデックス4)に固定するマッピング
 order_to_grid_map = {1: 0, 2: 1, 3: 2, 4: 4, 5: 5, 6: 3, 7: 6, 8: 7, 9: 8}
-
 images = {}
 labels = {}
 
 st.subheader("⚾️ 打線を組む")
-st.write("1番打者から順番に、好きなビールを入力してください（全部埋めなくてもOKです）。")
 
 for row in range(3):
     cols = st.columns(3)
@@ -103,89 +96,68 @@ for row in range(3):
             st.markdown(f"### 【{order}番打者】")
             uploaded_file = st.file_uploader(f"画像を選択", type=['jpg', 'jpeg', 'png', 'heic', 'webp'], key=f"up_{order}")
             if uploaded_file:
-                try:
-                    images[order] = Image.open(uploaded_file)
-                    st.write("✅ 読み込み完了")
-                except:
-                    st.error("エラー")
+                try: images[order] = Image.open(uploaded_file)
+                except: st.error("エラー")
             labels[order] = st.text_input(f"ブルワリー / ビール名", key=f"txt_{order}", placeholder="例：ヤッホー / よなよなエール")
 
-# 画像生成ロジック
 if st.button("🍺 この打線でインスタ縦長画像を生成する"):
     if not images:
         st.error("最低1枚は画像をアップロードしてください。")
     else:
         with st.spinner('画像を生成中...'):
-            canvas = Image.new('RGB', (CANVAS_W, CANVAS_H), (20, 20, 20))
+            canvas = Image.new('RGB', (CANVAS_W, CANVAS_H), (15, 15, 15))
             draw = ImageDraw.Draw(canvas)
 
-            # 日本語フォント設定
-            try:
-                title_font = ImageFont.truetype(FONT_PATH, 65)  # 少し小さく調整
-                hashtag_font = ImageFont.truetype(FONT_PATH, 35) # ハッシュタグ用
-                id_font = ImageFont.truetype(FONT_PATH, 35)
-                label_font = ImageFont.truetype(FONT_PATH, 32)
-            except:
-                title_font = ImageFont.load_default()
-                hashtag_font = ImageFont.load_default()
-                id_font = ImageFont.load_default()
-                label_font = ImageFont.load_default()
-
-            # 1. タイトルとハッシュタグの描画
+            # 1. タイトルセクション
             display_id = user_id if user_id != "@" else "私"
-            title_text = f"{display_id} を構成する ビール打線"
+            suffix = " を構成する ビール打線"
+            full_title = f"{display_id}{suffix}"
             hashtag_text = "#私を構成する9本のビール打線"
-            
-            # メインタイトル
-            bbox1 = draw.textbbox((0, 0), title_text, font=title_font)
-            tw1 = bbox1[2] - bbox1[0]
-            draw.text(((CANVAS_W - tw1) // 2, 60), title_text, font=title_font, fill=(255, 255, 255))
-            
-            # ハッシュタグ（タイトルの下）
-            bbox2 = draw.textbbox((0, 0), hashtag_text, font=hashtag_font)
-            tw2 = bbox2[2] - bbox2[0]
-            draw.text(((CANVAS_W - tw2) // 2, 160), hashtag_text, font=hashtag_font, fill=(200, 200, 200))
 
-            # 2. 各セルの描画
+            # タイトルのオートリサイズ（Excelの縮小表示風）
+            title_font = get_fitting_font(full_title, CANVAS_W - 100, 70)
+            bbox_t = draw.textbbox((0, 0), full_title, font=title_font)
+            tw = bbox_t[2] - bbox_t[0]
+            draw.text(((CANVAS_W - tw) // 2, 50), full_title, font=title_font, fill=(255, 255, 255))
+
+            # ハッシュタグ
+            hash_font = ImageFont.truetype(FONT_PATH, 35)
+            bbox_h = draw.textbbox((0, 0), hashtag_text, font=hash_font)
+            hw = bbox_h[2] - bbox_h[0]
+            draw.text(((CANVAS_W - hw) // 2, 145), hashtag_text, font=hash_font, fill=(180, 180, 180))
+
+            # 2. グリッドセクション
+            label_font = ImageFont.truetype(FONT_PATH, 30)
             for order in range(1, 10):
                 grid_pos = order_to_grid_map[order]
                 r, c = grid_pos // 3, grid_pos % 3
                 x, y = c * CELL_SIZE, r * CELL_SIZE + OFFSET_Y
                 
                 if order in images:
-                    # 画像あり
-                    img_cropped = center_crop(images[order])
-                    canvas.paste(img_cropped, (x, y))
-                    
-                    # テキスト用の黒帯（高さを135pxに広げて2行分を確保）
-                    overlay_h = 135
-                    overlay = Image.new('RGBA', (CELL_SIZE, overlay_h), (0, 0, 0, 200))
+                    canvas.paste(center_crop(images[order]), (x, y))
+                    overlay_h = 145 # 文字がはみ出さないよう高さを確保
+                    overlay = Image.new('RGBA', (CELL_SIZE, overlay_h), (0, 0, 0, 210))
                     canvas.paste(overlay, (x, y + CELL_SIZE - overlay_h), overlay)
                     
-                    # テキスト描画のロジック
-                    # 「 / 」で区切られていれば改行、なければそのまま表示
-                    raw_input = labels[order]
-                    if " / " in raw_input:
-                        display_text = f"{order}. " + raw_input.replace(" / ", "\n")
-                    elif "/" in raw_input:
-                        display_text = f"{order}. " + raw_input.replace("/", "\n")
-                    else:
-                        display_text = f"{order}. {raw_input}"
-                    
-                    # 複数行描画（spacingで2行の間隔を調整）
-                    draw.multiline_text((x + 15, y + CELL_SIZE - 120), display_text, font=label_font, fill=(255, 255, 255), spacing=8)
+                    # 銘柄の描画（改行と収まりを重視）
+                    raw_text = labels[order].replace(" / ", "\n").replace("/", "\n")
+                    display_text = f"{order}. {raw_text}"
+                    wrapped = wrap_text(display_text, label_font, CELL_SIZE - 30)
+                    draw.multiline_text((x + 15, y + CELL_SIZE - overlay_h + 10), wrapped, font=label_font, fill=(255, 255, 255), spacing=6)
                 else:
-                    # 画像なし：白枠
-                    draw.rectangle([x, y, x + CELL_SIZE, y + CELL_SIZE], fill=(40, 40, 40), outline=(100, 100, 100), width=2)
-                    draw.text((x + CELL_SIZE//3, y + CELL_SIZE//2), f"{order}番", font=label_font, fill=(100, 100, 100))
+                    draw.rectangle([x, y, x + CELL_SIZE, y + CELL_SIZE], fill=(30, 30, 30), outline=(80, 80, 80), width=2)
+                    draw.text((x + CELL_SIZE//3, y + CELL_SIZE//2), f"{order}番", font=label_font, fill=(80, 80, 80))
 
-            # 3. フッター (Instagram ID)
-            if user_id and user_id != "@":
+            # 3. フッターセクション（枠外に配置）
+            if user_id != "@":
                 footer_text = f"Created by {user_id}"
-                draw.text((CANVAS_W - 450, CANVAS_H - 70), footer_text, font=id_font, fill=(150, 150, 150))
+                footer_font = ImageFont.truetype(FONT_PATH, 30)
+                bbox_f = draw.textbbox((0, 0), footer_text, font=footer_font)
+                fw = bbox_f[2] - bbox_f[0]
+                # グリッドのすぐ下の枠外スペースに配置
+                draw.text(((CANVAS_W - fw) // 2, CANVAS_H - 55), footer_text, font=footer_font, fill=(120, 120, 120))
 
-            st.image(canvas, caption="完成！長押しして保存してください")
-            
+            st.image(canvas, caption="完成！長押しで保存してください")
             buf = io.BytesIO()
             canvas.save(buf, format="PNG")
             st.download_button(label="📥 画像をダウンロード", data=buf.getvalue(), file_name="beer_lineup.png", mime="image/png")
