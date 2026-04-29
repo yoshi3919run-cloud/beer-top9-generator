@@ -148,7 +148,7 @@ for row in range(3):
             if uploaded_file:
                 try: images[order] = Image.open(uploaded_file)
                 except: st.error("画像の読み込みに失敗しました")
-            labels[order] = st.text_input(f"ブルワリー / ビール名", key=f"txt_{order}", placeholder="例：ヤッホー / よなよな")
+            labels[order] = st.text_input(f"ビール名 / ブルワリー", key=f"txt_{order}", placeholder="例：よなよなエール / ヤッホーブルーイング")
 
 # --- 生成ボタン（文言とゴールド色を維持） ---
 if st.button("⚾️ チームを作る（画像生成）"):
