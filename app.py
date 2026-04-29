@@ -23,7 +23,7 @@ def download_font():
 
 download_font()
 
-# --- ボタンとUIのカスタマイズCSS ---
+# --- ボタンとUIのカスタマイズCSS（色を維持） ---
 st.markdown("""
 <style>
     /* チームを作るボタン（ゴールド） */
@@ -58,7 +58,7 @@ IMG_PADDING = 15
 IMG_SIZE = CELL_SIZE - (IMG_PADDING * 2)
 OFFSET_Y = 210  
 
-# フォントサイズ自動調整
+# フォントサイズ自動調整（タイトル等）
 def get_fitting_font(text, max_width, initial_size):
     size = initial_size
     while size > 20:
@@ -70,7 +70,7 @@ def get_fitting_font(text, max_width, initial_size):
         size -= 2
     return ImageFont.truetype(FONT_PATH, size)
 
-# テキスト折り返し
+# テキスト折り返し（スラッシュを維持して日本語を優先改行）
 def wrap_text_tight(text, font, max_width, max_lines=3):
     lines = []
     current_line = ""
@@ -96,7 +96,7 @@ def center_crop(img):
 st.set_page_config(page_title="#推しビールで打線を組んでみた", layout="wide")
 st.title("⚾️ #推しビールで打線を組んでみた メーカー")
 
-# --- 統一された説明文 ---
+# --- 元の詳細な説明文を復旧 ---
 st.write("""
 ビールは、人生を語る。
 あなたを形作った、忘れられない9本で最強の布陣を組んでみませんか？
@@ -119,7 +119,7 @@ st.write("""
 なお、写真がなくても文字だけの打線を作ることも可能です。
 """)
 
-# --- ご指定のSNS共有案内（2行に分けて改行） ---
+# --- SNS共有案内（ご指定通り2行に分けて改行） ---
 st.success("""
 📸 **完成したらSNSでシェアしよう！**
 
@@ -142,19 +142,24 @@ for row in range(3):
         order = row * 3 + col + 1 
         with cols[col]:
             st.markdown(f"### 【{order}番】")
+            # 写真入力のラベルを「画像を選択」に維持
             uploaded_file = st.file_uploader(f"画像を選択", type=['jpg', 'jpeg', 'png', 'heic', 'webp'], key=f"up_{order}")
             if uploaded_file:
                 try: images[order] = Image.open(uploaded_file)
-                except: st.error("ERR")
+                except: st.error("画像の読み込みに失敗しました")
             labels[order] = st.text_input(f"ブルワリー / ビール名", key=f"txt_{order}", placeholder="例：ヤッホー / よなよな")
 
+# --- 生成ボタン（文言とゴールド色を維持） ---
 if st.button("⚾️ チームを作る（スコアボード生成）"):
     if not images and not any(labels.values()):
         st.error("入力が必要です")
     else:
         with st.spinner('スタジアムを設営中...'):
+            # 背景：スタジアム・グリーン
             canvas = Image.new('RGB', (CANVAS_W, CANVAS_H), (15, 60, 35)) 
             draw = ImageDraw.Draw(canvas)
+            
+            # 電光掲示板ヘッダー
             draw.rectangle([50, 40, CANVAS_W - 50, 190], fill=(5, 10, 5), outline=(100, 100, 100), width=2)
             led_yellow = (255, 191, 0) 
 
@@ -163,47 +168,78 @@ if st.button("⚾️ チームを作る（スコアボード生成）"):
                 hash_font = ImageFont.truetype(FONT_PATH, 34)
                 label_font = ImageFont.truetype(FONT_PATH, 28)
                 footer_font = ImageFont.truetype(FONT_PATH, 30)
-                panel_font = ImageFont.truetype(FONT_PATH, 36)
+                panel_font = ImageFont.truetype(FONT_PATH, 36) # 文字のみ用
             except: title_font = hash_font = label_font = footer_font = panel_font = ImageFont.load_default()
 
-            draw.text(((CANVAS_W - draw.textbbox((0,0), f"{team_name} のビール打線", font=title_font)[2])//2, 55), f"{team_name} のビール打線", font=title_font, fill=led_yellow)
-            draw.text(((CANVAS_W - draw.textbbox((0,0), "#推しビールで打線を組んでみた", font=hash_font)[2])//2, 135), "#推しビールで打線を組んでみた", font=hash_font, fill=led_yellow)
+            # タイトル描画
+            display_title = f"{team_name} のビール打線"
+            bbox_t = draw.textbbox((0,0), display_title, font=title_font)
+            tw = bbox_t[2] - bbox_t[0]
+            draw.text(((CANVAS_W - tw)//2, 55), display_title, font=title_font, fill=led_yellow)
 
+            # ハッシュタグ描画
+            hashtag_text = "#推しビールで打線を組んでみた"
+            bbox_h = draw.textbbox((0,0), hashtag_text, font=hash_font)
+            hw = bbox_h[2] - bbox_h[0]
+            draw.text(((CANVAS_W - hw)//2, 135), hashtag_text, font=hash_font, fill=led_yellow)
+
+            # 各セルの描画
             for order in range(1, 10):
                 grid_pos = order_to_grid_map[order]
                 r, c = grid_pos // 3, grid_pos % 3
                 x, y = c * CELL_SIZE, r * CELL_SIZE + OFFSET_Y
+                
+                # スコアボードの枠線
                 draw.rectangle([x, y, x + CELL_SIZE, y + CELL_SIZE], outline=(255, 255, 255, 15), width=1)
 
                 prefix = "【原点】" if order == 1 else "【エース】" if order == 4 else ""
                 
+                # 画像があるかどうかの判定（ここを最優先に修正）
                 if order in images:
-                    # 画像あり
-                    canvas.paste(center_crop(images[order]), (x + IMG_PADDING, y + IMG_PADDING))
+                    # 画像あり：写真をパディング付きで配置
+                    img_cropped = center_crop(images[order])
+                    canvas.paste(img_cropped, (x + IMG_PADDING, y + IMG_PADDING))
+                    
+                    # ラベルエリア（4番は黄金パネル）
                     overlay_h = 135 
                     overlay_color = (184, 134, 11, 230) if order == 4 else (0, 0, 0, 210)
                     overlay = Image.new('RGBA', (IMG_SIZE, overlay_h), overlay_color)
                     canvas.paste(overlay, (x + IMG_PADDING, y + IMG_PADDING + IMG_SIZE - overlay_h), overlay)
+                    
+                    # テキスト描画
                     display_text = f"{order}. {prefix} {labels[order]}"
                     wrapped = wrap_text_tight(display_text, label_font, IMG_SIZE - 20)
-                    draw.multiline_text((x + IMG_PADDING + 10, y + IMG_PADDING + IMG_SIZE - overlay_h + 10), wrapped, font=label_font, fill=(255, 255, 255), spacing=4)
+                    draw.multiline_text((x + IMG_PADDING + 10, y + IMG_PADDING + IMG_SIZE - overlay_h + 10), 
+                                         wrapped, font=label_font, fill=(255, 255, 255), spacing=4)
+                
                 elif labels[order]:
-                    # 文字のみパネル
+                    # 写真なし・文字のみパターン（パネルとして表示）
                     panel_color = (184, 134, 11, 255) if order == 4 else (20, 50, 30, 255)
-                    draw.rectangle([x + IMG_PADDING, y + IMG_PADDING, x + CELL_SIZE - IMG_PADDING, y + CELL_SIZE - IMG_PADDING], fill=panel_color, outline=(255,255,255,30))
+                    draw.rectangle([x + IMG_PADDING, y + IMG_PADDING, x + CELL_SIZE - IMG_PADDING, y + CELL_SIZE - IMG_PADDING], 
+                                   fill=panel_color, outline=(255,255,255,30))
+                    
                     display_text = f"{order}. {prefix}\n{labels[order]}"
                     wrapped = wrap_text_tight(display_text, panel_font, IMG_SIZE - 40, max_lines=5)
-                    draw.multiline_text((x + CELL_SIZE//2, y + CELL_SIZE//2), wrapped, font=panel_font, fill=(255, 255, 255), anchor="mm", align="center", spacing=8)
+                    # パネルの中央に配置
+                    draw.multiline_text((x + CELL_SIZE//2, y + CELL_SIZE//2), wrapped, font=panel_font, fill=(255, 255, 255), 
+                                         anchor="mm", align="center", spacing=8)
+                
                 else:
-                    # 空枠
+                    # 何も入力がない：空枠パネル
                     draw.rectangle([x + 15, y + 15, x + CELL_SIZE - 15, y + CELL_SIZE - 15], fill=(30, 80, 50))
                     status = "原点" if order == 1 else "エース" if order == 4 else f"{order}番"
                     draw.text((x + 115, y + 155), status, font=label_font, fill=(60, 120, 80))
 
-            draw.text(((CANVAS_W - draw.textbbox((0,0), "Produced by World Beer Lab", font=footer_font)[2])//2, CANVAS_H - 55), "Produced by World Beer Lab", font=footer_font, fill=(255, 255, 255, 100))
+            # フッター（被らないよう最下部に配置）
+            footer_text = "Produced by World Beer Lab"
+            bbox_f = draw.textbbox((0,0), footer_text, font=footer_font)
+            fw = bbox_f[2] - bbox_f[0]
+            draw.text(((CANVAS_W - fw)//2, CANVAS_H - 55), footer_text, font=footer_font, fill=(255, 255, 255, 100))
 
-            st.image(canvas, caption="長押しして保存してください")
+            # 結果表示
+            st.image(canvas, caption="完成！長押しして保存してください")
             
+            # --- 保存ボタン（スタジアムグリーンと文言を維持） ---
             buf = io.BytesIO()
             canvas.save(buf, format="PNG")
             st.download_button(label="📥 チームを保存（スコアボード保存）", data=buf.getvalue(), file_name="beer_lineup.png", mime="image/png")
