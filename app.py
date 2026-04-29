@@ -23,7 +23,7 @@ def download_font():
 
 download_font()
 
-# --- ボタンの配色とUIのカスタマイズ ---
+# --- ボタンとUIのカスタマイズCSS ---
 st.markdown("""
 <style>
     /* チームを作るボタン（ゴールド） */
@@ -96,7 +96,7 @@ def center_crop(img):
 st.set_page_config(page_title="#推しビールで打線を組んでみた", layout="wide")
 st.title("⚾️ #推しビールで打線を組んでみた メーカー")
 
-# --- 説明文を完全復旧（タグ付けの下りも追加） ---
+# --- 統一された説明文 ---
 st.write("""
 ビールは、人生を語る。
 あなたを形作った、忘れられない9本で最強の布陣を組んでみませんか？
@@ -117,15 +117,16 @@ st.write("""
 📸 **写真についてのヒント**
 「あの1本の写真がない！」という時は、公式サイトの画像を**引用（スクリーンショット等）**して思い出を補完してもOKです。
 なお、写真がなくても文字だけの打線を作ることも可能です。
-
----
-
-**📸 完成したらSNSでシェアしよう！**
-ハッシュタグ **#推しビールで打線を組んでみた** を付けて投稿！
-**@world_beer_lab** をタグ付けしてシェアしてくれたら、監督（ジミー）が全力でコメントしに伺います🍻
 """)
 
-st.success("**🏆 あなたの最強ナインを教えてください！プレイボール！**")
+# --- ご指定のSNS共有案内（2行に分けて改行） ---
+st.success("""
+📸 **完成したらSNSでシェアしよう！**
+
+#推しビールで打線を組んでみた を付けて投稿！
+
+**@world_beer_lab** をタグ付けしてシェアしてくれたら、監督（ジミー）が全力でコメントしに伺います🍻
+""")
 
 team_name = st.text_input("👤 監督名（またはチーム名）を入力", "@")
 
@@ -177,6 +178,7 @@ if st.button("⚾️ チームを作る（スコアボード生成）"):
                 prefix = "【原点】" if order == 1 else "【エース】" if order == 4 else ""
                 
                 if order in images:
+                    # 画像あり
                     canvas.paste(center_crop(images[order]), (x + IMG_PADDING, y + IMG_PADDING))
                     overlay_h = 135 
                     overlay_color = (184, 134, 11, 230) if order == 4 else (0, 0, 0, 210)
@@ -186,12 +188,14 @@ if st.button("⚾️ チームを作る（スコアボード生成）"):
                     wrapped = wrap_text_tight(display_text, label_font, IMG_SIZE - 20)
                     draw.multiline_text((x + IMG_PADDING + 10, y + IMG_PADDING + IMG_SIZE - overlay_h + 10), wrapped, font=label_font, fill=(255, 255, 255), spacing=4)
                 elif labels[order]:
+                    # 文字のみパネル
                     panel_color = (184, 134, 11, 255) if order == 4 else (20, 50, 30, 255)
                     draw.rectangle([x + IMG_PADDING, y + IMG_PADDING, x + CELL_SIZE - IMG_PADDING, y + CELL_SIZE - IMG_PADDING], fill=panel_color, outline=(255,255,255,30))
                     display_text = f"{order}. {prefix}\n{labels[order]}"
                     wrapped = wrap_text_tight(display_text, panel_font, IMG_SIZE - 40, max_lines=5)
                     draw.multiline_text((x + CELL_SIZE//2, y + CELL_SIZE//2), wrapped, font=panel_font, fill=(255, 255, 255), anchor="mm", align="center", spacing=8)
                 else:
+                    # 空枠
                     draw.rectangle([x + 15, y + 15, x + CELL_SIZE - 15, y + CELL_SIZE - 15], fill=(30, 80, 50))
                     status = "原点" if order == 1 else "エース" if order == 4 else f"{order}番"
                     draw.text((x + 115, y + 155), status, font=label_font, fill=(60, 120, 80))
