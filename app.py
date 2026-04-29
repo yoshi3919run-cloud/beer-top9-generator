@@ -3,6 +3,7 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import requests
 import os
+from datetime import datetime
 from pillow_heif import register_heif_opener
 
 # iPhone写真(HEIC)対応
@@ -19,8 +20,7 @@ def download_font():
             response = requests.get(FONT_URL)
             with open(FONT_PATH, "wb") as f:
                 f.write(response.content)
-        except:
-            pass
+        except: pass
 
 download_font()
 
@@ -29,32 +29,29 @@ CANVAS_W = 1080
 CANVAS_H = 1350
 GRID_SIZE = 1080
 CELL_SIZE = GRID_SIZE // 3
-HEADER_H = 220  # タイトルエリア
+HEADER_H = 240  # 電光掲示板エリア
 OFFSET_Y = HEADER_H
 
-# --- ヘルパー関数：フォントサイズを自動調整（Excelの縮小表示風） ---
+# --- ヘルパー：フォントサイズ自動調整 ---
 def get_fitting_font(text, max_width, initial_size):
     size = initial_size
     while size > 20:
         try:
             font = ImageFont.truetype(FONT_PATH, size)
             bbox = ImageDraw.Draw(Image.new('RGB', (1, 1))).textbbox((0, 0), text, font=font)
-            if (bbox[2] - bbox[0]) <= max_width:
-                return font
-        except:
-            return ImageFont.load_default()
+            if (bbox[2] - bbox[0]) <= max_width: return font
+        except: return ImageFont.load_default()
         size -= 2
     return ImageFont.truetype(FONT_PATH, size)
 
-# --- ヘルパー関数：日本語対応のテキスト折り返し ---
+# --- 日本語対応テキスト折り返し ---
 def wrap_text(text, font, max_width):
     lines = []
     current_line = ""
     for char in text:
         test_line = current_line + char
         bbox = ImageDraw.Draw(Image.new('RGB', (1, 1))).textbbox((0, 0), test_line, font=font)
-        if (bbox[2] - bbox[0]) <= max_width:
-            current_line = test_line
+        if (bbox[2] - bbox[0]) <= max_width: current_line = test_line
         else:
             lines.append(current_line)
             current_line = char
@@ -71,10 +68,9 @@ def center_crop(img):
     bottom = (h + new_size) / 2
     return img.crop((left, top, right, bottom)).resize((CELL_SIZE, CELL_SIZE), Image.LANCZOS)
 
-st.set_page_config(page_title="私を構成する9本のビール打線メーカー", layout="wide")
+st.set_page_config(page_title="推しビールで打線を組んでみた", layout="wide")
 
-# アプリUIのデザイン
-st.title("⚾️ #私を構成する9本のビール打線 メーカー")
+st.title("⚾️ #推しビールで打線を組んでみた メーカー")
 
 st.write("""
 ビールは、人生を語る。
@@ -85,36 +81,22 @@ st.write("""
 **【打線の組み方ガイド】**
 
 ✅ **1番（左上）：『原点』**
-あなたがビール沼に落ちた「きっかけの1本」を選びましょう。
+あなたがビール沼に落ちた「きっかけの1本」
 
 ✅ **4番（真ん中）：『エース』**
-あなたの人生で最も影響を与えた「不動の4番バッター」を配置してください。
+あなたの人生で最も影響を与えた、不動の4番バッター
 
 ✅ **9枚全部埋まらなくてもOK！**
-1枚からでも作成可能です。空いた枠はスタジアムのパネル風に表示されます。
+空いた枠はスタジアムのパネルとして表示されます。
+
+📸 **写真がない時は？**
+公式サイトの画像を**引用（スクリーンショット等）**して思い出を補完してもOKです。
 """)
 
-st.success("""
-**📸 完成したらSNSでシェアしよう！**
+st.success("**📸 完成したら #推しビールで打線を組んでみた でシェア！**")
 
-ハッシュタグ **#私を構成する9本のビール打線** を付けて投稿！
-@world_beer_lab をタグ付けしてもらえると、監督（ジミー）が全力で見に行きます🍻
-""")
+team_name = st.text_input("👤 監督名（またはチーム名）", "@", help="画像の中央タイトルになります。")
 
-st.info("""
-📸 **写真についてのヒント**
-
-「あの頃の1本の写真がない！」という時は、公式サイトの画像を**引用（スクリーンショット等）**して思い出を補完してもOKです。
-""")
-
-# 入力項目（チーム名/IDを1つに統合）
-team_name = st.text_input(
-    "👤 チーム名 または Instagram ID", 
-    "@", 
-    help="画像の中央タイトルになります。例：『三軒茶屋IPAズ』や自分のIDなど"
-)
-
-# 4番を中央(インデックス4)に固定するマッピング
 order_to_grid_map = {1: 0, 2: 1, 3: 2, 4: 4, 5: 5, 6: 3, 7: 6, 8: 7, 9: 8}
 images = {}
 labels = {}
@@ -127,43 +109,55 @@ for row in range(3):
         order = row * 3 + col + 1 
         with cols[col]:
             st.markdown(f"### 【{order}番】")
-            uploaded_file = st.file_uploader(f"画像を選択", type=['jpg', 'jpeg', 'png', 'heic', 'webp'], key=f"up_{order}")
+            uploaded_file = st.file_uploader(f"画像", type=['jpg', 'jpeg', 'png', 'heic', 'webp'], key=f"up_{order}")
             if uploaded_file:
                 try: images[order] = Image.open(uploaded_file)
-                except: st.error("エラー")
+                except: st.error("ERR")
             labels[order] = st.text_input(f"ブルワリー / ビール名", key=f"txt_{order}", placeholder="例：ヤッホー / よなよな")
 
-# 画像生成
 if st.button("🏟️ スコアボードを生成する"):
     if not images and not labels:
         st.error("入力を開始してください。")
     else:
-        with st.spinner('スタジアムを設営中...'):
+        with st.spinner('プレイボール！...'):
             # 背景：スタジアム・グリーン
-            canvas = Image.new('RGB', (CANVAS_W, CANVAS_H), (26, 77, 46)) # 深い緑
+            canvas = Image.new('RGB', (CANVAS_W, CANVAS_H), (15, 55, 35)) 
             draw = ImageDraw.Draw(canvas)
 
-            # フォント読み込み
+            # 1. 電光掲示板（ヘッダー）エリアの背景
+            draw.rectangle([40, 30, CANVAS_W - 40, 210], fill=(10, 10, 10), outline=(80, 80, 80), width=3)
+
+            # フォント設定
             try:
-                id_font = ImageFont.truetype(FONT_PATH, 32)
+                led_color = (255, 180, 0) # 電光掲示板のアンバー色
+                id_font = ImageFont.truetype(FONT_PATH, 30)
                 hash_font = ImageFont.truetype(FONT_PATH, 38)
                 label_font = ImageFont.truetype(FONT_PATH, 30)
-                num_font = ImageFont.truetype(FONT_PATH, 34)
+                small_font = ImageFont.truetype(FONT_PATH, 24)
             except:
-                id_font = hash_font = label_font = num_font = ImageFont.load_default()
+                led_color = (255, 255, 255)
+                id_font = hash_font = label_font = small_font = ImageFont.load_default()
 
-            # 1. タイトルのオートリサイズ描画
-            display_title = f"⚾️ {team_name} のビール打線 🍺"
-            title_font = get_fitting_font(display_title, CANVAS_W - 120, 75)
+            # --- タイトル1：〇〇のビール打線 ---
+            display_title = f"{team_name} のビール打線"
+            # 縮小表示機能
+            title_font = get_fitting_font(display_title, CANVAS_W - 200, 70)
             bbox_t = draw.textbbox((0, 0), display_title, font=title_font)
             tw = bbox_t[2] - bbox_t[0]
-            draw.text(((CANVAS_W - tw) // 2, 55), display_title, font=title_font, fill=(255, 255, 255))
+            draw.text(((CANVAS_W - tw) // 2, 55), display_title, font=title_font, fill=led_color)
 
-            # ハッシュタグ
-            hashtag_text = "#私を構成する9本のビール打線"
+            # --- タイトル2：ハッシュタグ ---
+            hashtag_text = "#推しビールで打線を組んでみた"
             bbox_h = draw.textbbox((0, 0), hashtag_text, font=hash_font)
             hw = bbox_h[2] - bbox_h[0]
-            draw.text(((CANVAS_W - hw) // 2, 155), hashtag_text, font=hash_font, fill=(200, 200, 200))
+            draw.text(((CANVAS_W - hw) // 2, 145), hashtag_text, font=hash_font, fill=led_color)
+
+            # 監督・日付情報（情報の整理）
+            today = datetime.now().strftime("%Y.%m.%d")
+            info_text = f"MANAGER: {team_name}   |   STADIUM: World Beer Lab   |   DATE: {today}"
+            bbox_i = draw.textbbox((0, 0), info_text, font=small_font)
+            iw = bbox_i[2] - bbox_i[0]
+            draw.text(((CANVAS_W - iw) // 2, 220), info_text, font=small_font, fill=(200, 200, 200))
 
             # 2. グリッドセクション
             for order in range(1, 10):
@@ -171,46 +165,43 @@ if st.button("🏟️ スコアボードを生成する"):
                 r, c = grid_pos // 3, grid_pos % 3
                 x, y = c * CELL_SIZE, r * CELL_SIZE + OFFSET_Y
                 
-                # 枠線（スコアボード風）
+                # 枠線
                 draw.rectangle([x, y, x + CELL_SIZE, y + CELL_SIZE], outline=(255, 255, 255, 30), width=1)
 
                 if order in images:
-                    # 画像あり
                     canvas.paste(center_crop(images[order]), (x, y))
                     
-                    # ラベルエリア
-                    overlay_h = 140
-                    # 4番（エース）は琥珀色ゴールド、他は黒
-                    overlay_color = (184, 134, 11, 220) if order == 4 else (0, 0, 0, 200)
+                    overlay_h = 150 # 高さを確保
+                    # 4番（エース）は琥珀色ゴールド、他は黒パネル
+                    overlay_color = (160, 110, 20, 230) if order == 4 else (0, 0, 0, 210)
                     overlay = Image.new('RGBA', (CELL_SIZE, overlay_h), overlay_color)
                     canvas.paste(overlay, (x, y + CELL_SIZE - overlay_h), overlay)
                     
-                    # 称号とテキスト
+                    # ラベルの描画
                     prefix = "【原点】" if order == 1 else "【エース】" if order == 4 else ""
                     raw_text = labels[order].replace(" / ", "\n").replace("/", "\n")
+                    # 日本語の途中でも強制改行し、英単語はなるべく維持
                     display_text = f"{order}. {prefix}\n{raw_text}"
                     
                     wrapped = wrap_text(display_text, label_font, CELL_SIZE - 20)
-                    draw.multiline_text((x + 15, y + CELL_SIZE - overlay_h + 10), wrapped, font=label_font, fill=(255, 255, 255), spacing=5)
+                    draw.multiline_text((x + 15, y + CELL_SIZE - overlay_h + 10), wrapped, font=label_font, fill=(255, 255, 255), spacing=6)
                 else:
-                    # 画像なし：スコアボードパネル
-                    draw.rectangle([x + 10, y + 10, x + CELL_SIZE - 10, y + CELL_SIZE - 10], fill=(35, 90, 55))
-                    status_text = "原点" if order == 1 else "エース" if order == 4 else f"{order}番"
-                    bbox_s = draw.textbbox((0, 0), status_text, font=num_font)
-                    sw = bbox_s[2] - bbox_s[0]
-                    draw.text((x + (CELL_SIZE - sw) // 2, y + CELL_SIZE // 2 - 20), status_text, font=num_font, fill=(80, 140, 100))
+                    # 空枠
+                    draw.rectangle([x + 10, y + 10, x + CELL_SIZE - 10, y + CELL_SIZE - 10], fill=(25, 70, 45))
+                    status = "原点" if order == 1 else "エース" if order == 4 else f"{order}番"
+                    draw.text((x + 100, y + 150), status, font=label_font, fill=(50, 110, 70))
 
-            # 3. 最下部枠外フッター
-            footer_text = "Created by World Beer Lab"
-            bbox_f = draw.textbbox((0, 0), footer_text, font=id_font)
+            # 3. フッター (枠外)
+            footer_text = "Produced by World Beer Lab"
+            bbox_f = draw.textbbox((0, 0), footer_text, font=small_font)
             fw = bbox_f[2] - bbox_f[0]
-            draw.text(((CANVAS_W - fw) // 2, CANVAS_H - 65), footer_text, font=id_font, fill=(255, 255, 255, 100))
+            draw.text(((CANVAS_W - fw) // 2, CANVAS_H - 60), footer_text, font=small_font, fill=(255, 255, 255, 100))
 
-            # 表示とダウンロード
+            # 表示
             st.image(canvas, caption="長押しして保存してください")
             buf = io.BytesIO()
             canvas.save(buf, format="PNG")
-            st.download_button(label="📥 スコアボードをダウンロード", data=buf.getvalue(), file_name="beer_scoreboard.png", mime="image/png")
+            st.download_button(label="📥 スコアボードを保存", data=buf.getvalue(), file_name="beer_lineup.png", mime="image/png")
 
 st.write("---")
-st.caption("Produced by @world_beer_lab")
+st.caption("© World Beer Lab")
